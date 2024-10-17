@@ -1,6 +1,6 @@
 ---
-title: Documentation
-next: first-page
+title: 文档
+next: learn-gin-web
 ---
 
 This is a demo of the theme's documentation layout.
