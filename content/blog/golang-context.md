@@ -15,8 +15,9 @@ excludeSearch: true
 本文使用的go版本信息： go version go1.21.1 darwin/arm64
 {{< /callout >}}
 ## 关于上下文
-Golang官方库的Context(上下文)是开发过程中经常用到的API，大多数时候我们会直接使用`context.Background()`来创建一个Context，这个上下文可以用来存储一些数据，
-设置超时时间和主动取消，正是这些功能，我们可以用Context来控制Goroutine的生命周期，传递参数和信号。
+Golang官方库的Context(上下文)是开发过程中经常用到的API，大多数时候我们会直接使用`context.Background()`来创建一个Context。
+
+我们可以借助不同的上下文来存储数据，设置超时时间和主动取消它来控制Goroutine的生命周期，传递参数和信号或是实现其他业务场景。
 
 ## 接口定义
 先看Context的接口定义：

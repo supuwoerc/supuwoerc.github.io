@@ -1,18 +1,29 @@
 ---
-title: 文档
-next: learn-gin-web
+title: 项目文档
+next: learn-threejs
 ---
 
-This is a demo of the theme's documentation layout.
+这部分主要是我学习和实践相关技术的笔记，这里的文章对应着一个技术栈/库/中间件的学习，基本上我保持将每一次 commit 都记录下来。
 
-## Hello, World!
+## 从零构建Gin服务
 
-```go {filename="main.go"}
-package main
+这是我学习 Golang 之后的一个实践项目，利用主流的 Gin、GORM、go-redis、go-jwt等相关技术构建的一个后台管理服务。
 
-import "fmt"
+当然，在实践的过程我也学习了补充了很对API的学习文章，这部分内容我会放在[博客](/blog)，因为和项目没直接关系，不知道怎么分类，干脆一股脑放到博客目录下，作为一些基础知识，可以作为闲暇时的知识补充。
 
-func main() {
-    fmt.Println("Hello, World!")
-}
-```
+## 从零开始实现前端应用
+
+这部分的内容是我如何从零开始实现一个前端项目，也是为了配合 [从零构建Gin服务](#从零构建Gin服务)项目而做的前端工程，在这个项目里面我大多选择一些我不熟悉的技术来实现，一是
+为了接触和探索自己的不熟悉的内容，二是跳出自己的舒适圈。
+
+项目部分包含了 React 18、Arco-Design、TanStack Query、Recoil 、Cypress、Vitest... 等技术，也有我为了实现某一项功能而自己封装的 NPM 包，很多都是我新学习和在项目上尝试的，希望你也能和我一起试一下这些新鲜有趣的内容。
+
+## 学习Three.js
+
+23年我学习了一段 WebGL 的课程，也看了一段时间的 Three.js ，甚至还学习了几天的建模软件 Blender ，但是因为当时正是年底，隔着一个假期，这个部分的学习在新年之后就断了，没能坚持记录下去。
+
+在这里我会将我学习 Three.js 的笔记和过程记录下来，我学习的基础是 [Three.js](https://threejs.org/) 官网上推荐的 [threejs-journey](https://threejs-journey.com/)，我基本上就是跟随作者完成每一个章节的练习，当然作为补充，在课外还需要自己收集一些资源作为补充。
+
+Three.js 的底层依赖是 WebGL 技术，它设计很多底层的渲染逻辑和机制，所以，最好能大致了解一下，这样学习 Three.js 能更轻松的理解一些 API。
+
+同时 GAMES101 计算机图形学的知识也可以学习一下，这部分十分的难，并且涉及大量的数学概念，我的学习方式是自上而下，也就是先从高度封装的库学习起来，得首先能做出东西，给自己不断的正反馈，让自己能坚持学习下去。

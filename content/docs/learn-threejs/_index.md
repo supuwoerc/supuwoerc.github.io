@@ -1,8 +1,6 @@
 ---
-title: 从零构建Gin服务
+title: 学习Three.js
 type: docs
-prev: docs/first-page
-next: docs/folder/leaf
 sidebar:
   open: true
 ---
