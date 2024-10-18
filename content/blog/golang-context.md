@@ -94,7 +94,9 @@ func main() {
 ### Err
 Context 的 Err 方法将返回上下文取消相关的错误，包含下面几种情况：
 * `nil`:当前上下文未被取消
+
 * `context.Canceled`:表示是主动调用了`cancel`方法取消了上下文
+
 * `context.DeadlineExceeded`:表示到达了截止时间，上下文自动取消
 
 ```go
@@ -160,6 +162,7 @@ func TODO() Context {
 
 实际这两个方法的使用场景也略有差异：
 * `context.Background`：通常用于在顶层（例如在主函数、初始化或在一个没有其他合适上下文的起始位置）创建一个根上下文。
+
 * `context.TODO`：当您不确定应该使用哪种具体的上下文，或者当前的函数稍后会被修改以接收一个合适的上下文时使用。它类似于一个占位符，表示这个上下文可能需要在未来被完善或替换。
 
 ## cancelCtx
@@ -179,10 +182,15 @@ type canceler interface {
 }
 ```
 * `Context`：这是创建当前 `cancelCtx` 所基于的父上下文。
+
 * `mu sync.Mutex`：互斥锁，用于保护对内部状态的并发访问，确保在多协程环境下数据的一致性和安全性。
+
 * `done atomic.Value`：这是一个通道，当上下文被取消时会被关闭，用于通知相关的操作该上下文已被取消。
+
 * `children map[canceler]struct{}`：用于存储基于当前上下文创建的子上下文，以便在当前上下文取消时，能够通知子上下文也进行取消操作。
+
 * `err error`：存储取消操作的错误信息。当上下文被取消时，通过 `Err` 方法可以获取这个错误。
+
 * `cause error`：存储取消操作的自定义错误信息。当上下文被取消时，通过 `Cause` 方法可以获取这个自定义错误。
 
 ### Deadline
@@ -337,9 +345,13 @@ func propagateCancel(parent Context, child canceler) {
 propagateCancel 和 parentCancelCtx 较为重要，此处再次总结 propagateCancel 是如何将取消行为向下传播给 child 上下文：
 
 * 调用 parent 的 Done 方法来获取标记上下文本取消的 chanel，如果返回值是 nil 则代表 parent 上下文不可取消，不用向下传播取消行为。
+
 * Done 返回值不是 nil，借助 select 来检查一下 parent 是不是已经关闭，是的话调用 child 的 cancel 来将取消行为传播下去
+
 * parent 未关闭，因为 select 存在 default 分支，继续向下执行
+
 * 调用 parentCancelCtx 来判断 parent 是不是 cancelCtx ，是的话先判断 parent 的 err，如果 err 不是 nil 则取消 child，否则将 child 添加到 parent 的 children map 中，整个判断过程需要加锁，因为 err 和 map 操作都不是并发安全的。
+
 * 当 parentCancelCtx 返回值表明 parent 不是 cancelCtx ，那就创建一个协程来监听 parent.Done() 的通道，如果 parent 取消，则调用 child 的 cancel。
 
 ### cancel 方法
@@ -406,6 +418,7 @@ type valueCtx struct {
 }
 ```
 * Context：这是创建当前 valueCtx 所基于的父上下文。
+
 * key/val：当前 valueCtx 所存储的键值对。
 
 > 从结构体定义来看 valueCtx 只能存储一对键值，同时 Value 方法的实现（下文介绍了查找原理）是依次向上查找 key 对应的 val 的。
@@ -446,6 +459,7 @@ func value(c Context, key any) any {
 }
 ```
 * 如果 valueCtx 存储的 key 就是要查询的 key ，那么直接返回 val 。
+
 * 如果不是，则调用 value 方法去做循环，依次向上级上下文中查找，因为 golang 不存在 while 循环，直接用了 for 去实现了 while 查找。
 
 ### 创建valueCtx
@@ -519,6 +533,7 @@ deadline, cancel := context.WithDeadline(context.Background(), time.Now().Add(10
 timeout, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 ```
 * `context.WithDeadline`：创建一个在具体时间截止的上下文。
+
 * `context.WithTimeout`：创建一个在多长时间后截止的上下文。
 
 下面是`WithDeadline`的源码实现，我将关键位置添加了注释：
