@@ -6,7 +6,7 @@ sidebar:
   open: true
 ---
 
-本篇文章基于上篇文章[01.基础场景](docs/learn-threejs/basic-scene)，介绍如何移动场景中的对象。
+本篇文章基于上篇文章[01.基础场景](docs/learn-threejs/basic-scene)，介绍如何对场景中的对象进行移动/缩放/旋转。
 
 源码文件：[02.transform-objects](https://github.com/supuwoerc/threejs-roadmap/blob/main/02.transform-objects/src/main.ts)
 
@@ -99,7 +99,7 @@ scene.add(axesHelper);
 
 ## 缩放
 
-代码示例中的 mesh 继承了 Object3D，所以 mesh 可以直接调用相关的方法。
+这部分介绍如何对一个对象进行缩放，Three.js中的 Mesh 继承了 Object3D，所以 mesh 实例可以直接设置相关属性，调用相关的方法。
 
 ```typescript
 export class Mesh<
@@ -130,6 +130,8 @@ mesh.scale.set(2, 0.5, 1);
 ```
 
 ## 旋转
+
+这部分介绍如何对一个对象进行旋转，同时介绍旋转中涉及到的一些概念。
 
 在 Three.js 中，旋转是改变物体方向的重要操作，主要有以下两种常见的方式：
 
@@ -246,4 +248,4 @@ group.add(mesh, box, box2);
 group.scale.set(1.2, 1.2, 1.2);
 scene.add(group);
 ```
-
+借助 Group 我们可以快速的批量处理多个元素，同时在场景中划分出合理的模块，减少维护的复杂度。

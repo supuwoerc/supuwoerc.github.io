@@ -11,7 +11,10 @@ sidebar:
 
 源码文件：[01.basic-scene](https://github.com/supuwoerc/threejs-roadmap/blob/main/01.basic-scene/src/main.ts)
 
-## 方法说明
+## 源码示例
+
+第一节的内容十分简单，不过多展开，直接在代码中添加了一些注释来解释：
+
 ```typescript
 import * as THREE from "three";
 const sizes = {
