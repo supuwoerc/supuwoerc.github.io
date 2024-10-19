@@ -49,3 +49,13 @@ params:
   editURL:
     enable: true
     base: "https://github.com/supuwoerc/supuwoerc.github.io/edit/main/content"
+
+  comments:
+    enable: true
+    type: giscus
+
+    giscus:
+      repo: supuwoerc/supuwoerc.github.io
+      repoId: R_kgDONBLHPg
+      category: Announcements
+      categoryId: DIC_kwDONBLHPs4Cjgbc

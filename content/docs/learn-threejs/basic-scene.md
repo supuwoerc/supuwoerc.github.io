@@ -2,6 +2,7 @@
 title: 01.基础场景
 type: docs
 prev: docs/learn-threejs
+next: docs/learn-threejs/transform-objects
 sidebar:
   open: true
 ---
