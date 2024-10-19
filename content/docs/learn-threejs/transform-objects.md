@@ -6,7 +6,7 @@ sidebar:
   open: true
 ---
 
-本篇文章基于上篇文章[01.基础场景](docs/learn-threejs/basic-scene)，介绍如何对场景中的对象进行移动/缩放/旋转。
+本篇文章基于上篇文章[01.基础场景](/docs/learn-threejs/basic-scene)，介绍如何对场景中的对象进行移动/缩放/旋转。
 
 源码文件：[02.transform-objects](https://github.com/supuwoerc/threejs-roadmap/blob/main/02.transform-objects/src/main.ts)
 
