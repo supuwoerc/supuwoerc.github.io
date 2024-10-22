@@ -1,1 +1,1 @@
-hugo mod tidy && hugo server --buildDrafts --disableFastRender
+hugo mod tidy && hugo server --buildDrafts=false --disableFastRender
