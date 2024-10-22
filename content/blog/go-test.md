@@ -135,7 +135,248 @@ testing.M 是 testing 包中用于控制整个测试过程的结构体。在需�
 
   * m.Run() 方法用于运行所有测试，返回值是测试结果的状态码（0 表示成功）。
 
-## 子测试
-## 基准测试
+### 跳过部分测试
+
+为了节省时间，我们借助 testing.Short 和 testing.T.Skip 方法来标记和跳过当前的测试用例，当运行的实施传入 -short 参数，就可以跳过一部分测试代码。
+
+```go
+func TestShort(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+	t.Log("代码逻辑")
+}
+```
+在命令行中执行 ` go test -short -v` 后，将跳过当前测试用例：
+
+```shell
+=== RUN   TestShort
+    a_test.go:9: skipping test in short mode.
+--- SKIP: TestShort (0.00s)
+PASS
+ok      gin-web 0.314s
+```
+
+## 子测试 & Table-Driven Approach
+
+前面介绍了 *testing.T 的 Run 方法，支持创建子测试，我们为前问的 Add 方法来创建多个子测试。
+
+```go
+func TestAdd(t *testing.T) {
+	t.Run("1+1", func(t *testing.T) {
+		if got := Add(1, 1); got != 2 {
+			t.Errorf("Add(1,1) = %d, want %d\n", got, 2)
+		}
+	})
+	t.Run("-1+1", func(t *testing.T) {
+		if got := Add(-1, 1); got != 0 {
+			t.Errorf("Add(-1,1) = %d, want %d\n", got, 0)
+		}
+	})
+	t.Run("-1+-1", func(t *testing.T) {
+		if got := Add(-1, -1); got != -2 {
+			t.Errorf("Add(-1,-1) = %d, want %d\n", got, -2)
+		}
+	})
+}
+```
+执行 `go test -v`后，我们能查看到每一个子用例的执行结果：
+```shell
+=== RUN   TestAdd
+=== RUN   TestAdd/1+1
+=== RUN   TestAdd/-1+1
+=== RUN   TestAdd/-1+-1
+--- PASS: TestAdd (0.00s)
+    --- PASS: TestAdd/1+1 (0.00s)
+    --- PASS: TestAdd/-1+1 (0.00s)
+    --- PASS: TestAdd/-1+-1 (0.00s)
+PASS
+ok      gin-web 0.293s
+```
+
+使用子测试可以为一个测试目标创建多个用例，但是依旧比较麻烦，所以官方还推荐我们使用 Table-Driven Approach 来实现方法的大量数据集测试。
+
+Table-Driven Approach 也就是为测试用例准备表格一样的数据来作为参数，不需要调整测试用例本身，再扩展用例的时候只需要扩展这份数据即可，例如下面这个例子来测试前问的 Add 方法：
+
+```go
+func TestAdd(t *testing.T) {
+	cases := []struct {
+		a, b, expect int64
+	}{
+		{1, 1, 2},
+		{1, -1, 0},
+		{-1, -1, -2},
+	}
+	for _, item := range cases {
+		if got := Add(item.a, item.b); got != item.expect {
+			t.Errorf("Add(%d, %d) = %d, want %d", item.a, item.b, got, item.expect)
+		}
+	}
+}
+```
+在后续的扩展中，我们只需要扩展 cases 即可。
+
+## 并行测试
+
+前面提到的子测试和 Table-Driven Approach 存在大量的测试用例需要执行，这些用例的执行是顺序的，我们很容易发现我们可以借助 Golang 优秀的并发实现来完成用例的并发执行。
+
+例如存在这样的三个测试：
+```go
+func TestA(t *testing.T) {
+	time.Sleep(time.Second)
+	t.Log("TestA is running...")
+}
+
+func TestB(t *testing.T) {
+	time.Sleep(3 * time.Second)
+	t.Log("TestB is running...")
+}
+
+func TestC(t *testing.T) {
+	t.Run("TestC1", func(t *testing.T) {
+		time.Sleep(3 * time.Second)
+		t.Log("TestC1 is running...")
+	})
+	t.Run("TestC2", func(t *testing.T) {
+		time.Sleep(5 * time.Second)
+		t.Log("TestC2 is running...")
+	})
+}
+```
+执行 `go test -v` 查看运行结果和耗时，发现一共需要 12s 以上，如果存在很多耗时的测试用例，这样的时间是无法忍受的：
+```shell
+=== RUN   TestA
+    a_test.go:32: TestA is running...
+--- PASS: TestA (1.00s)
+=== RUN   TestB
+    a_test.go:37: TestB is running...
+--- PASS: TestB (3.00s)
+=== RUN   TestC
+=== RUN   TestC/TestC1
+    a_test.go:43: TestC1 is running...
+=== RUN   TestC/TestC2
+    a_test.go:47: TestC2 is running...
+--- PASS: TestC (8.00s)
+    --- PASS: TestC/TestC1 (3.00s)
+    --- PASS: TestC/TestC2 (5.00s)
+PASS
+ok      gin-web 12.327s
+```
+下面我们借助 `Parallel` 来开启并发执行用例：
+
+```go
+func TestA(t *testing.T) {
+	t.Parallel()
+	time.Sleep(time.Second)
+	t.Log("TestA is running...")
+}
+
+func TestB(t *testing.T) {
+	t.Parallel()
+	time.Sleep(3 * time.Second)
+	t.Log("TestB is running...")
+}
+
+func TestC(t *testing.T) {
+	t.Parallel()
+	t.Run("TestC1", func(t *testing.T) {
+		t.Parallel()
+		time.Sleep(3 * time.Second)
+		t.Log("TestC1 is running...")
+	})
+	t.Run("TestC2", func(t *testing.T) {
+		t.Parallel()
+		time.Sleep(5 * time.Second)
+		t.Log("TestC2 is running...")
+	})
+}
+```
+再次执行 `go test -v` 查看执行，发现只需要 5s 左右了：
+
+```shell
+=== RUN   TestA
+=== PAUSE TestA
+=== RUN   TestB
+=== PAUSE TestB
+=== RUN   TestC
+=== PAUSE TestC
+=== CONT  TestA
+=== CONT  TestB
+=== CONT  TestC
+=== RUN   TestC/TestC1
+=== PAUSE TestC/TestC1
+=== RUN   TestC/TestC2
+=== PAUSE TestC/TestC2
+=== CONT  TestC/TestC1
+=== CONT  TestC/TestC2
+=== NAME  TestA
+    a_test.go:33: TestA is running...
+--- PASS: TestA (1.00s)
+=== NAME  TestC/TestC1
+    a_test.go:47: TestC1 is running...
+=== NAME  TestB
+    a_test.go:39: TestB is running...
+--- PASS: TestB (3.00s)
+=== NAME  TestC/TestC2
+    a_test.go:52: TestC2 is running...
+--- PASS: TestC (0.00s)
+    --- PASS: TestC/TestC1 (3.00s)
+    --- PASS: TestC/TestC2 (5.00s)
+PASS
+ok      gin-web 5.315s
+```
+并行测试能在子测试场景下节约大量的执行时间，尤其在子测试很多同时子测试存在耗时操作的时候，效率提升明显。
+
+
+## 帮助函数
 ## Setup & TearDown
+## 网络测试
+## 基准测试
 ## 模糊测试
+## 示例函数Example
+## 第三方库
+### gotests
+
+首先介绍：[cweill/gotests](https://github.com/cweill/gotests) ，这是一个为我们自动生成 Table-Driven Approach 用例的库。
+
+#### 安装
+```shell
+$ go get -u github.com/cweill/gotests/...
+```
+#### 使用
+```shell
+$ gotests [options] PATH ...
+```
+### 参数选项
+```shell
+  -all                  为所有功能和方法生成测试
+
+  -excl                 为不匹配的函数和方法生成测试。优先于 -only、-exported 和 -all
+
+  -exported             为导出函数和方法生成测试。优先于 -only 和 -all
+
+  -i                    在错误信息中打印测试输入
+
+  -only                 为仅匹配的函数和方法生成测试。优先于 -all
+
+  -nosubtests           当 >= Go 1.7 时禁用子测试生成
+
+  -parallel             >= Go 1.7 时启用并行子测试生成。
+
+  -w                    将输出写入（测试）文件，而不是 stdout
+
+  -template_dir         包含自定义测试代码模板的目录路径。优先于 优先于 -template。也可通过环境变量 GOTESTS_TEMPLATE_DIR 设置。
+
+  -template             指定自定义测试代码模板，如 testify。也可通过环境变量 GOTESTS_TEMPLATE 设置
+
+  -template_params_file 通过 json 文件读取模板的外部参数
+
+  -template_params      使用 stdin 通过 json 读取模板的外部参数
+```
+我要为 abc.go 这个文件里的方法创建测试用例：
+ 
+```shell
+gotests -all abc.go
+```
+
+执行完成后将生成对应的文件和测试用例，我们只需要补充 case 即可。
