@@ -1,11 +1,10 @@
 ---
-title: Golang中的单元测试和模糊测试
+title: Golang中的测试
 date: 2024-10-22
 authors:
   - name: Idris
     link: https://github.com/supuwoerc
 excludeSearch: true
-draft: true
 ---
 
 随着项目的复杂度和层级越来越复杂，单元测试和模糊测试成为项目不可或缺的一部分，
@@ -196,21 +195,41 @@ ok      gin-web 0.293s
 
 使用子测试可以为一个测试目标创建多个用例，但是依旧比较麻烦，所以官方还推荐我们使用 Table-Driven Approach 来实现方法的大量数据集测试。
 
-Table-Driven Approach 也就是为测试用例准备表格一样的数据来作为参数，不需要调整测试用例本身，再扩展用例的时候只需要扩展这份数据即可，例如下面这个例子来测试前问的 Add 方法：
+Table-Driven Approach 也就是为测试用例准备表格一样的数据来作为参数，后续不需要调整测试用例本身，在扩展用例的时候只需要扩展这份数据即可，例如下面这个例子来测试前问的 Add 方法：
 
 ```go
 func TestAdd(t *testing.T) {
-	cases := []struct {
-		a, b, expect int64
-	}{
-		{1, 1, 2},
-		{1, -1, 0},
-		{-1, -1, -2},
+	type args struct {
+		a int
+		b int
 	}
-	for _, item := range cases {
-		if got := Add(item.a, item.b); got != item.expect {
-			t.Errorf("Add(%d, %d) = %d, want %d", item.a, item.b, got, item.expect)
-		}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{
+			name: "1+1",
+			args: args{1, 1},
+			want: 2,
+		},
+		{
+			name: "-1+-1",
+			args: args{-1, -1},
+			want: -2,
+		},
+		{
+			name: "0+0",
+			args: args{0, 0},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Add(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("Add() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 ```
@@ -218,7 +237,7 @@ func TestAdd(t *testing.T) {
 
 ## 并行测试
 
-前面提到的子测试和 Table-Driven Approach 存在大量的测试用例需要执行，这些用例的执行是顺序的，我们很容易发现我们可以借助 Golang 优秀的并发实现来完成用例的并发执行。
+前面提到的子测试和 Table-Driven Approach 存在大量的子测试用例需要执行，这些用例的执行是顺序的，我们很容易发现我们可以借助 Golang 优秀的并发实现来完成用例的并发执行。
 
 例如存在这样的三个测试：
 ```go
@@ -327,17 +346,460 @@ ok      gin-web 5.315s
 ```
 并行测试能在子测试场景下节约大量的执行时间，尤其在子测试很多同时子测试存在耗时操作的时候，效率提升明显。
 
-
 ## 帮助函数
-## Setup & TearDown
+
+很多时候我们会将一部分通用逻辑抽离成为一个独立的方法，类似前面提到的表格驱动测试法，不过抽离出来的独立的方法报错信息可能不像表格驱动一样的直观，例如下面的例子：
+
+```go
+type args struct {
+	a int
+	b int
+}
+
+type testCase struct {
+	name string
+	args args
+	want int
+}
+
+func createAddCase(t *testing.T, tt testCase) {
+	if got := Add(tt.args.a, tt.args.b); got != tt.want {
+		t.Errorf("Add() = %v, want %v", got, tt.want)
+	}
+}
+
+func TestAdd(t *testing.T) {
+	tests := []testCase{
+		{
+			name: "1+1",
+			args: args{1, 1},
+			want: 2,
+		},
+		{
+			name: "-1+-1",
+			args: args{-1, -1},
+			want: -2,
+		},
+		{
+			name: "0+1",
+			args: args{0, 1},
+			want: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			createAddCase(t, tt)
+		})
+	}
+}
+```
+执行 `go test -v` 之后：
+
+```shell
+=== RUN   TestAdd
+=== RUN   TestAdd/1+1
+=== RUN   TestAdd/-1+-1
+=== RUN   TestAdd/0+0
+    add_test.go:18: Add() = 1, want 0
+--- FAIL: TestAdd (0.00s)
+    --- PASS: TestAdd/1+1 (0.00s)
+    --- PASS: TestAdd/-1+-1 (0.00s)
+    --- FAIL: TestAdd/0+0 (0.00s)
+FAIL
+exit status 1
+FAIL    gin-web/test    0.469s
+```
+从报错信息来看，我们只能看到报错行数是封装出来的的函数，而不清楚调用者的行数，而借助 Helper 我们可以查看调用者的信息：
+
+```go
+func createAddCase(t *testing.T, tt testCase) {
+	t.Helper()
+	if got := Add(tt.args.a, tt.args.b); got != tt.want {
+		t.Errorf("Add() = %v, want %v", got, tt.want)
+	}
+}
+```
+从下面的执行信息可以很简单的发现错误调用来自 add_test.go:43 ,比之前的 add_test.go:18 更能方便开发者找到调用者的信息：
+```shell
+=== RUN   TestAdd
+=== RUN   TestAdd/1+1
+=== RUN   TestAdd/-1+-1
+=== RUN   TestAdd/0+1
+    add_test.go:43: Add() = 1, want 0
+--- FAIL: TestAdd (0.00s)
+    --- PASS: TestAdd/1+1 (0.00s)
+    --- PASS: TestAdd/-1+-1 (0.00s)
+    --- FAIL: TestAdd/0+1 (0.00s)
+FAIL
+exit status 1
+FAIL    gin-web/test    0.917s
+```
+
+## Setup & Teardown
+
+很多时候，在执行测试用例的前后阶段我们需要执行一些初始化和清理的行为，或者很多个测试用例的前后逻辑都是一样的，一般这种场景需要借助 Setup 来做执行用例前的初始化，用 Teardown 来做清理和资源回收类的动作。
+
+这里要引入 TestMain 函数，TestMain 方法是一个测试文件的 Main 方法，执行其他用例之前都会执行它，函数签名：func TestMain(m *testing.M)，其中 m.Run 方法的前后可以执行 Setup 和 Teardown，同时应该使用方法执行的返回值作为参数调用 os.Exit 。
+
+```go
+func TestMain(m *testing.M) {
+    // setup
+	fmt
+	r := m.Run()    
+	// teardown
+	os.Exit(r)                           
+}
+```
+其中 m.Run 默认将执行文件内的全部用例，也可以通过 -run 来指定要匹配的用例。
+
 ## 网络测试
+
+很多时候，在 Web 工程中，我们需要在 API 开发完成后测试接口能够正常工作，为了贴近实际，这部分一般不实用 Mock 技术来模拟，我们需要发送真实的网络请求来测试。
+
+### 测试 HTTP Server Handler
+在不借助其他社区框架， Golang 官方库就能快速实现一个简单的 HTTP Server Handler：
+
+```go
+func upperCaseHandler(w http.ResponseWriter, r *http.Request) {
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	keyword := query.Get("keyword")
+	if strings.TrimSpace(keyword) == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(strings.ToUpper(keyword)))
+}
+
+func main() {
+	http.HandleFunc("/upper", upperCaseHandler)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		panic(err)
+	}
+}
+```
+假设现在存在这样一个 API，我们需要验证 upperCaseHandler 能够正常工作，可以分为2个步骤：
+
+* 创建请求：借助 httptest.NewRequest 方法创建 http.Request 
+
+* 记录响应：借助 httptest.NewRecorder 实现 http.ResponseWriter，该类型返回httptest.ResponseRecorder，可以借助它进行后续的记录和断言
+
+```go
+func TestPingHandler(t *testing.T) {
+	request := httptest.NewRequest("http.MethodGet", "/upper?keyword=abc", nil)
+	recorder := httptest.NewRecorder()
+	upperCaseHandler(recorder, request)
+	response := recorder.Result()
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", response.StatusCode, http.StatusOK)
+	}
+	all, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("handler returned unexpected body: got %v want nil", err)
+	}
+	if string(all) != "ABC" {
+		t.Errorf("handler returned unexpected body: got %v want %v", response.Body, "ABC")
+	}
+}
+```
+执行 `go test -v` 查看结果：
+
+```shell
+=== RUN   TestPingHandler
+--- PASS: TestPingHandler (0.00s)
+PASS
+ok      gin-web 0.266s
+```
+
+### 测试HTTP Client
+
+前面的测试是直接测试了 upperCaseHandler 来验证方法逻辑，但是如果需要测试 一个 HTTP Client 的逻辑 ，我们并不关系服务器端的接口实现，但是很难实现对整个服务器的模拟，例如下面这个例子：
+
+```go
+type Client struct {
+	URL string
+}
+
+func NewClient(url string) *Client {
+	return &Client{url}
+}
+
+func (c *Client) UpperCase(keyword string) (string, error) {
+	resp, err := http.Get(c.URL + "?keyword=" + keyword)
+	if err != nil {
+		return "", err
+	}
+	all, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return strings.ToUpper(string(all)), nil
+}
+```
+其中 UpperCase 方法使用了 http.Get 向远端发送了请求，我们如何模拟这个远端服务器？
+
+下面介绍我么应该如何实现一个模拟的 Server ，借助 httptest.NewServer 我们能定义一个 Server 来自定义想要的远端服务，具体看下面的示例代码：
+
+```go
+func TestClient(t *testing.T) {
+	want := "abc"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(want))
+	}))
+	defer server.Close()
+	client := NewClient(server.URL)
+	result, err := client.UpperCase(want)
+	if err != nil {
+		t.Errorf("handler returned unexpected body: got %v want nil", err)
+	}
+	if result != strings.ToUpper(want) {
+		t.Errorf("handler returned unexpected body: got %v want %v", result, want)
+	}
+}
+```
+httptest.NewServer 能帮我们快速模拟一个远端的服务，我们只需要关心我们的业务逻辑的测试，而不用将大量的时间花费在建立远端的服务器和 API。
+
+### 测试Gin框架下的API
+
+除了前面的两种情况，大多数时候，我们的服务都是依赖一些 Web 框架实现的，下面介绍如何测试 Gin 框架的 API，其他框架大同小异，这里给出一些参考和大致的步骤：
+
+这是我们要测试的 API 实现：
+```go
+func Upper(ctx *gin.Context) {
+	keyword := ctx.Query("keyword")
+	if keyword == "" {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	ctx.String(http.StatusOK, strings.ToUpper(keyword))
+}
+```
+针对这个方法，我们的测试用例需要完成几个步骤：
+
+* 创建 Gin 服务，如果存在多个用例，我们可以考虑借助前面的 Setup 来在 TestMain 统一创建。
+
+* 挂载路由，将要测试的方法挂载到 Gin 路由上。
+
+* 借助 httptest.NewRequest 和 httptest.NewRecorder 创建请求和响应记录。
+
+> gin.Default 创建出来的的 engine 实际上实现了 http.Handler，我们可以方便的调用它的 ServeHTTP 方法传入请求和响应记录对象来完成测试，类似前文测试 HTTP Server Handler：
+
+
+```go
+func setup() *gin.Engine {
+	engine := gin.Default()
+	return engine
+}
+
+func TestUpper(t *testing.T) {
+	engine := setup()
+	engine.GET("/upper", Upper)
+	tests := []struct {
+		name string
+		args string
+		want string
+		code int
+	}{
+		{
+			name: "normal string",
+			args: "abc",
+			want: "ABC",
+			code: http.StatusOK,
+		},
+		{
+			name: "empty string",
+			args: "",
+			want: "",
+			code: http.StatusBadRequest,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/upper?keyword="+tt.args, nil)
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			if response.Code != tt.code {
+				t.Errorf("got %v, want %v", response.Code, tt.code)
+				return
+			}
+			if response.Body.String() != tt.want {
+				t.Errorf("got %s, want %s", response.Body.String(), tt.want)
+			}
+		})
+	}
+}
+```
+
+测试结果：
+```shell
+=== RUN   TestUpper/normal_string
+[GIN] 2024/10/23 - 16:23:30 | 200 |       5.167µs |       192.0.2.1 | GET      "/upper?keyword=abc"
+=== RUN   TestUpper/empty_string
+[GIN] 2024/10/23 - 16:23:30 | 400 |       1.167µs |       192.0.2.1 | GET      "/upper?keyword="
+--- PASS: TestUpper (0.00s)
+    --- PASS: TestUpper/normal_string (0.00s)
+    --- PASS: TestUpper/empty_string (0.00s)
+PASS
+```
+
 ## 基准测试
+
+基准测试目的是测试在一定负载情况下的程序性能，基准测试函数签名：`func BenchmarkName(b *testing.B)`，执行基准测试需要使用参数 `-bench`.
+
+在基准测试函数内部，通过一个循环执行被测试的代码。b.N 会根据需要自动调整，以确保测试有足够的运行时间来获取准确的性能数据。
+
+下面我们简单的测试 Add 方法：
+
+```go
+func BenchmarkAdd(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		Add(1, 1)
+	}
+}
+```
+执行 `go test -v -bench=Add` 输出如下：
+```shell
+goos: darwin
+goarch: arm64
+pkg: gin-web
+BenchmarkAdd
+BenchmarkAdd-8          1000000000               0.2973 ns/op
+PASS
+ok      gin-web 1.068s
+```
+其中 BenchmarkAdd-8 中的8代表启用的GOMAXPROCS，0.2973 ns/op 表示 1000000000 次调用每次平均耗时 0.2973 ns。
+
+### 内存基准测试
+
+除了 `-bench` 之外，我们还可以查看统计内存占用的情况，使用 `-benchmem` 参数即可启用：
+
+```shell
+go test -v -bench=Add -benchmem
+```
+输出如下：
+```shell
+goos: darwin
+goarch: arm64
+pkg: gin-web
+BenchmarkAdd
+BenchmarkAdd-8          1000000000               0.2970 ns/op          0 B/op          0 allocs/op
+PASS
+ok      gin-web 1.161s
+```
+其中，0 B/op表示每次操作内存分配0字节，0 allocs/op则表示每次操作进行0次内存分配，因为 Add 方法不涉及内存分配等行文。
+
+### 排除耗时操作
+
+如果基准测试存在一部分我们不关心的耗时操作，可以将这部分排除出时间统计之外，让基准测试只测试我们关心的部分：
+
+```go
+func setup() {
+	time.Sleep(time.Second * 3)
+}
+
+func BenchmarkAdd(b *testing.B) {
+	setup()
+	for i := 0; i < b.N; i++ {
+		Add(1, 1)
+	}
+}
+```
+上面的测试用例中 setup 是一个耗时操作，并不是我们要测试的方法主体，我们如果直接执行测试会得到一个这样的结果：
+
+```shell
+goos: darwin
+goarch: arm64
+pkg: gin-web
+BenchmarkAdd
+BenchmarkAdd-8   	       1	3001135458 ns/op
+PASS
+```
+3001135458 ns/op 并不是 Add 方法执行的速度，我们需要校准时间。
+
+```go
+func BenchmarkAdd(b *testing.B) {
+	setup()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Add(1, 1)
+	}
+}
+```
+再次测试，得到一个我们关心的值：
+
+```shell
+goos: darwin
+goarch: arm64
+pkg: gin-web
+BenchmarkAdd
+BenchmarkAdd-8   	507145735	         2.075 ns/op
+PASS
+```
+### 并发基准测试
+和单元测试一样，基准测试的执行也是顺序的，如果我们需要模拟并发的场景下的性能，可以像下面的例子一样借助 RunParallel 方法：
+```go
+func BenchmarkAdd(b *testing.B) {
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			Add(1, 1)
+		}
+	})
+}
+```
+执行结果：
+```shell
+goos: darwin
+goarch: arm64
+pkg: gin-web
+BenchmarkAdd
+BenchmarkAdd-8   	1000000000	         0.5857 ns/op
+PASS
+```
+
 ## 模糊测试
-## 示例函数Example
+
+Fuzz 测试（模糊测试）是一种用于发现代码中潜在错误和漏洞的测试技术。
+
+{{< callout type="warning" >}}
+模糊测试是 go 1.18 引入的特性，请注意版本。
+{{< /callout >}}
+
+Fuzz 测试会自动生成大量的随机输入数据，并将这些数据传递给被测试的函数或程序。通过不断尝试各种可能的输入，Fuzz 测试有机会触发一些在正常测试中难以覆盖到的边界情况和异常情况，从而发现潜在的问题。
+
+官方的入门文档：[fuzz testing](https://go.dev/doc/security/fuzz/)，我们下面实现一个简单方法，这个方法存在一个 bug ，我们期望借助模糊测试对我们的方法测试帮助我们找到这个 bug：
+
+```go
+func Double(param int) int {
+	// 方法在param为10985存在bug
+	if param == 10985 {
+		return param 
+	}
+	return param * 2
+}
+```
+
+
+
+
 ## 第三方库
 ### gotests
 
-首先介绍：[cweill/gotests](https://github.com/cweill/gotests) ，这是一个为我们自动生成 Table-Driven Approach 用例的库。
+首先介绍：[cweill/gotests](https://github.com/cweill/gotests) ，这是一个为我们自动生成 Table-Driven Approach 用例的库。并且，这个功能在 Goland 已经实现了！
+
+#### ide 中的 gotests
+
+首先放一下如何在 Goland 使用这些功能：
+
+选中要测试的方法 -> Generate -> Tests for selection/package/file 即可，十分的简单。
+
+![gotests](./go-test/gotests.png)
+
+现在再介绍如果不使用 Goland 如何借助 gotest 生成表格驱动法的测试用例：
 
 #### 安装
 ```shell
@@ -347,7 +809,7 @@ $ go get -u github.com/cweill/gotests/...
 ```shell
 $ gotests [options] PATH ...
 ```
-### 参数选项
+#### 参数选项
 ```shell
   -all                  为所有功能和方法生成测试
 
@@ -380,3 +842,11 @@ gotests -all abc.go
 ```
 
 执行完成后将生成对应的文件和测试用例，我们只需要补充 case 即可。
+
+### 数据库 mock
+
+[go-sqlmock](https://github.com/DATA-DOG/go-sqlmock)是为了实现数据库的 mock 场景而生的一个方案。
+
+[redismock](https://github.com/go-redis/redismock)是为了实现 redis 的 mock 场景而生的一个方案。
+
+以上的两个库后面我会单独写博客来说明如何使用。
