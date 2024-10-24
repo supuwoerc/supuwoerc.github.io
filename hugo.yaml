@@ -50,6 +50,10 @@ params:
     enable: true
     base: "https://github.com/supuwoerc/supuwoerc.github.io/edit/main/content"
 
+  blog:
+    list:
+      displayTags: true
+
   comments:
     enable: true
     type: giscus

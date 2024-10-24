@@ -5,6 +5,9 @@ authors:
   - name: Idris
     link: https://github.com/supuwoerc
 excludeSearch: true
+tags:
+  - Golang
+  - 基础
 ---
 
 本文介绍Golang中Context的实现和一些常见的使用场景

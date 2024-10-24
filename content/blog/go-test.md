@@ -5,6 +5,9 @@ authors:
   - name: Idris
     link: https://github.com/supuwoerc
 excludeSearch: true
+tags:
+  - Golang
+  - 测试
 ---
 
 随着项目的复杂度和层级越来越复杂，单元测试和模糊测试成为项目不可或缺的一部分，
@@ -771,20 +774,38 @@ Fuzz 测试（模糊测试）是一种用于发现代码中潜在错误和漏洞
 
 Fuzz 测试会自动生成大量的随机输入数据，并将这些数据传递给被测试的函数或程序。通过不断尝试各种可能的输入，Fuzz 测试有机会触发一些在正常测试中难以覆盖到的边界情况和异常情况，从而发现潜在的问题。
 
-官方的入门文档：[fuzz testing](https://go.dev/doc/security/fuzz/)，我们下面实现一个简单方法，这个方法存在一个 bug ，我们期望借助模糊测试对我们的方法测试帮助我们找到这个 bug：
+官方的入门文档：[fuzz testing](https://go.dev/doc/tutorial/fuzz)，文档中创建了一个反转字符串的方法，并借助模糊测试找到了其中存在的潜在问题，建议仔细阅读，掌握官方的测试方法。
+
+我们下面按照官方文档实现一个简单方法，这个方法存在 bug ，我们期望借助模糊测试对我们的方法测试帮助我们找到 bug 并修复：
 
 ```go
 func Double(param int) int {
-	// 方法在param为10985存在bug
-	if param == 10985 {
-		return param 
+	// 方法存在潜在的bug，参数小于-1024时会出现
+	if param < -1024 {
+		return param
 	}
 	return param * 2
 }
 ```
+执行模糊测试 `go test -fuzz=Fuzz`，得到输出：
+```shell
+=== RUN   FuzzDouble
+fuzz: elapsed: 0s, gathering baseline coverage: 0/9 completed
+failure while testing seed corpus entry: FuzzDouble/seed#5
+fuzz: elapsed: 0s, gathering baseline coverage: 4/9 completed
+--- FAIL: FuzzDouble (0.04s)
+    --- FAIL: FuzzDouble (0.00s)
+        main_test.go:33: Before: -10000, after: -10000
+FAIL
+```
+> 使用 go test -fuzz=Fuzz 运行模糊测试，一般需要几秒钟后使用 ctrl-C 停止模糊测试。否则模糊测试将一直运行，直到遇到失败的输入，
+> 或者通过 -fuzztime 标志指定时长。默认情况下，如果未发生故障，则永久运行。
 
+通过这个简单的方法，我们能发现在参数为 -10000 时程序未满足预期，我们可以借助 debug 来修复方法中的错误，模糊测试帮我们填充了大量的用例从而发现了错误。
 
+## gomock
 
+gomock 是 Go 编程语言的模拟框架。它与 Go 的内置测试包很好地集成在一起，但也可以在其他上下文中使用，我会单独写一篇[博客](/blog/go-mock)来介绍它。
 
 ## 第三方库
 ### gotests
@@ -841,12 +862,13 @@ $ gotests [options] PATH ...
 gotests -all abc.go
 ```
 
-执行完成后将生成对应的文件和测试用例，我们只需要补充 case 即可。
+执行完成后将生成对应的文件和测试用例，我们只需要补充 case 即可，大多数情况我会直接借助 Goland 内置的工具实现。
 
-### 数据库 mock
+### 其他
 
-[go-sqlmock](https://github.com/DATA-DOG/go-sqlmock)是为了实现数据库的 mock 场景而生的一个方案。
+* testify：[testify](https://github.com/stretchr/testify)是一个带有常见断言和 mock 的工具包，可与标准库很好地配合。
+* go-sqlmock：[go-sqlmock](https://github.com/DATA-DOG/go-sqlmock)是为了实现数据库的 mock 场景而生的一个方案。
+* redismock：[redismock](https://github.com/go-redis/redismock)是为了实现 redis 的 mock 场景而生的一个方案。
+* goconvey：[goconvey](https://github.com/smartystreets/goconvey)能够在浏览器中进行测试，与 'go test' 集成，用 Go 编写行为测试。
 
-[redismock](https://github.com/go-redis/redismock)是为了实现 redis 的 mock 场景而生的一个方案。
-
-以上的两个库后面我会单独写博客来说明如何使用。
+这部分第三方库的使用我会单独写博客介绍。
