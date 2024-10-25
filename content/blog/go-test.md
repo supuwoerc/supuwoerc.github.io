@@ -521,7 +521,7 @@ ok      gin-web 0.266s
 
 ### 测试HTTP Client
 
-前面的测试是直接测试了 upperCaseHandler 来验证方法逻辑，但是如果需要测试 一个 HTTP Client 的逻辑 ，我们并不关系服务器端的接口实现，但是很难实现对整个服务器的模拟，例如下面这个例子：
+前面的测试是直接测试了 upperCaseHandler 来验证方法逻辑，但是如果需要测试 一个 HTTP Client 的逻辑 ，我们并不关心服务器端的接口实现，但是很难实现对整个服务器的模拟，例如下面这个例子：
 
 ```go
 type Client struct {
