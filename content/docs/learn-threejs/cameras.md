@@ -6,7 +6,7 @@ sidebar:
   open: true
 ---
 
-本篇文章基于上篇文章[03.动画](/docs/learn-threejs/animations)，介绍Threejs中的动画。
+本篇文章基于上篇文章[03.动画](/docs/learn-threejs/animations)，介绍Threejs中的相机。
 
 源码文件：[04.cameras](https://github.com/supuwoerc/threejs-roadmap/blob/main/04.cameras/src/main.ts)
 
