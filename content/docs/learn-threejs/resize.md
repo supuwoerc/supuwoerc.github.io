@@ -118,5 +118,11 @@ MDN 上的全屏 API 介绍文档：[Fullscreen_API](https://developer.mozilla.o
 我们简单的在 Chrome 中实现：
 
 ```typescript
-
+window.addEventListener("dblclick", () => {
+  if (!document.fullscreenElement) {
+    document.querySelector(".webgl")?.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+});
 ```
