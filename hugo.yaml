@@ -53,6 +53,8 @@ params:
   blog:
     list:
       displayTags: true
+      sortBy: date
+      sortOrder: asc # or "asc"
 
   comments:
     enable: true
