@@ -54,7 +54,7 @@ params:
     list:
       displayTags: true
       sortBy: date
-      sortOrder: asc # or "asc"
+      sortOrder: desc # or "asc"
 
   comments:
     enable: true
