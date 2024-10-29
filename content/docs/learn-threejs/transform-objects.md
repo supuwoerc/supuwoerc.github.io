@@ -1,7 +1,7 @@
 ---
 title: 02.移动/缩放/旋转对象
 type: docs
-prev: docs/learn-threejs/basic-scene
+date: 2024-10-20
 sidebar:
   open: true
 ---
