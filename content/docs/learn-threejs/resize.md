@@ -105,7 +105,7 @@ renderer.setPixelRatio(window.devicePixelRatio)
 // 设置渲染的像素比,限制最大像素比为2
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 ```
-同时，为了避免用户在不同显示器内拖动浏览器窗口导致 devicePixelRatio 的变化带来的挑战，我们需要在 resize 逻辑中也加上这部分的逻辑。
+同时，为了避免用户在不同显示器内拖动浏览器窗口导致 devicePixelRatio 的变化带来的调整，我们需要在 resize 逻辑中也加上这部分的逻辑。
 
 ## 全屏
 
