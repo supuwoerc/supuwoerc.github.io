@@ -1,5 +1,5 @@
 ---
-title: 从零开始学习Three.js
+title: Three.js Journey
 type: docs
 next: basic-scene
 sidebar:

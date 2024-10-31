@@ -1,5 +1,5 @@
 ---
-title: 从零构建Gin服务
+title: Gin Server Journey
 type: docs
 prev: docs/first-page
 next: docs/folder/leaf
