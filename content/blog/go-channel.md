@@ -10,7 +10,7 @@ authors:
 - 基础
 ---
 
-在 Go 语言中，channel（通道）是一种用于在 Goroutine 之间进行通信和同步的机制，本文介绍Golang中Channel的实现原理和常见的使用场景。
+在 Go 语言中，channel（通道）是一种用于在 Goroutine 之间进行通信和同步的机制，本文介绍 Golang 中 channel 的实现原理和常见的使用场景。
 
 <!--more-->
 ## 特点 & 作用
@@ -95,7 +95,7 @@ type hchan struct {
 	dataqsiz uint           // 环形数组的容量，即数组长度
 	buf      unsafe.Pointer 
 	elemsize uint16  // 元素的大小
-	closed   uint32。// 是否已经关闭的标志位
+	closed   uint32 // 是否已经关闭的标志位
 	elemtype *_type // 元素的类型
 	sendx    uint   // 填入数据的索引
 	recvx    uint   // 取出数据的索引
@@ -176,6 +176,13 @@ func makechan(t *chantype, size int) *hchan {
 4. 为创建的通道设置一些属性，如元素大小、元素类型、数据队列大小等，并初始化锁。
 5. 在调试模式下，打印有关创建的通道的信息。
 
+## 堵塞 & 非堵塞模式
+默认情况下，对 channel 的读写都是阻塞模式，只有在 select 语句中，sudog 中的成员 isSelect 会被标记为 true ，来表示当前处于非堵塞模式，这是
+为了避免在 select 语句的判断中真正的将协程序挂起，在非堵塞的模式下（多路复用场景下）：
+* 需要将协程挂起的行为，直接返回 false
+* 需要触发死锁的行为，直接返回 false
+* 能立即完成写入/读取的，直接返回 true
+
 ## 写入流程
 写入通道内部使用的是 chansend 方法，这个方法内部做了这些事情：
 1. 首先，处理通道为 nil 的情况。如果是非阻塞模式，直接返回 false；如果是阻塞模式，则让当前 Goroutine 挂起（使用 gopark）。
@@ -189,12 +196,7 @@ func makechan(t *chantype, size int) *hchan {
 
 其中缓冲区长度为0的就是无缓冲通道，写入/读取必须要配对，否则将立刻陷入死锁。
 
-### 堵塞 & 非堵塞模式
-默认情况下，对 channel 的读写都是阻塞模式，只有在 select 语句中，sudog 中的成员 isSelect 会被标记为 true ，来表示当前处于非堵塞模式，这是
-为了避免在 select 语句的判断中真正的将协程序挂起，在非堵塞的模式下（多路复用场景下）：
-* 需要将协程挂起的行为，直接返回 false
-* 需要触发死锁的行为，直接返回 false
-* 能立即完成写入/读取的，直接返回 true
+
 
 {{< callout type="warning" >}}
 下面的几种情况都是在堵塞模式下
@@ -307,6 +309,183 @@ if sg := c.recvq.dequeue(); sg != nil {
 ### 完整的写入流程
 写入到通道的流程图如下：
 ![wr](./go-channel/wr.png)
+
+## 读取流程
+
+写入通道内部使用的是 chanrecv 方法，这个方法内部做了这些事情：
+1. 判断处理通道为 nil 的情况：如果是非阻塞模式，直接返回 false；如果是阻塞模式，则让当前 Goroutine 挂起。
+2. 当是非阻塞接收的情况，检查通道是否为空且未关闭。如果是，则直接返回。
+3. 如果是阻塞接收，记录开始时间（用于性能分析）并获取通道锁。
+4. 检查通道是否已关闭：
+   * 如果已关闭且缓冲区为空，进行一些清理操作后返回。
+   * 如果已关闭但缓冲区有数据，处理缓冲区的数据。
+5. 如果通道未关闭且发送队列中有等待的发送者，进行接收操作。
+6. 如果通道缓冲区有数据，直接从缓冲区接收数据。
+7. 如果是非阻塞模式且以上条件都不满足，解锁并返回。
+8. 如果是阻塞模式且以上条件都不满足，创建一个 Sudog 结构，将当前 Goroutine 与通道关联，并将其放入接收队列，然后挂起当前 Goroutine 等待发送者。
+9. 当 sudog 被唤醒后，进行一些一致性检查、清理操作，并根据接收是否成功返回相应的结果。
+
+{{< callout type="warning" >}}
+下面的几种情况都是在堵塞模式下
+{{< /callout >}}
+
+### 读取时存在堵塞的写协程
+当读取通道的时候存在堵塞的写协程，不能向之前一样直接使用类似 send 的方法来交换数据，因为要确保顺序的读写，要保证 sendx 和 recvx 都能正确的指向相应的位置。
+```go 
+    lock(&c.lock)
+    if sg := c.sendq.dequeue(); sg != nil {
+        recv(c, sg, ep, func() { unlock(&c.lock) }, 3)
+        return true, true
+    }
+```
+该分支判断内部做了这些事情：
+* 加锁，防止并发操作引起的数据错乱。
+* 获取堵塞的写协程，判断是不是 nil。
+* 不是 nil ,存在堵塞的写入。
+* 判断有无缓冲区，没有的话直接唤醒写协程，有缓冲的话，将缓冲区的 recvx 对应的头部元素读取，同时将写协程写入 sendx 对应的位置，同时唤醒写协程。
+* 解锁
+
+流程图大致如下：
+![re_1](./go-channel/re_1.png)
+
+### 缓冲存在数据且无堵塞的写
+这种情况是最简单的，只需要直接读取数据同时更新相关索引即可：
+```go
+    lock(&c.lock)
+    if c.qcount > 0 {
+        qp := chanbuf(c, c.recvx)
+        if ep != nil {
+            typedmemmove(c.elemtype, ep, qp)
+        }
+        typedmemclr(c.elemtype, qp)
+        c.recvx++
+        if c.recvx == c.dataqsiz {
+            c.recvx = 0
+        }
+        c.qcount--
+        unlock(&c.lock)
+        return true, true
+    }
+```
+方法大致做了这么几件事：
+* 加锁
+* 检查通道的缓冲区中的元素数量 c.qcount 是否大于 0 。如果是，说明缓冲区中有数据可以接收。
+* 读取 recvx 对应位置的元素。
+* 更新 recvx 和 qcount。
+* 解锁
+
+大致的流程图如下：
+![re_2](./go-channel/re_2.png)
+
+### 缓冲区为空且无堵塞的写
+这种情况下，读协程将被添加到读堵塞队列中：
+```go
+    lock(&c.lock)
+    gp := getg()
+    mysg := acquireSudog()
+    mysg.elem = ep
+    gp.waiting = mysg
+    mysg.g = gp
+    mysg.c = c
+    gp.param = nil
+    c.recvq.enqueue(mysg)
+    atomic.Store8(&gp.parkingOnChan, 1)
+    gopark(chanparkcommit, unsafe.Pointer(&c.lock), waitReasonChanReceive, traceEvGoBlockRecv, 2)
+
+    gp.waiting = nil
+    success := mysg.success
+    gp.param = nil
+    mysg.c = nil
+    releaseSudog(mysg)
+```
+方法大致做了如下几个事情：
+* 加锁
+* 获取当前 Goroutine 信息，封装成为 sudog 。
+* 将 sudog 加入堵塞的读队列。
+* 挂起当前协程。
+* 添加活跃监听，当 sudog 被唤醒的时候，回收 sudog 。
+* 解锁
+
+大致的流程图入下：
+![re_3](./go-channel/re_3.png)
+
+### 完整的读取流程
+读取通道内容的流程图如下：
+![re](./go-channel/re.png)
+
+## 关闭通道
+关闭通道底层的源码：
+```go
+func closechan(c *hchan) {
+	if c == nil {
+		panic(plainError("close of nil channel"))
+	}
+	lock(&c.lock)
+	if c.closed != 0 {
+		unlock(&c.lock)
+		panic(plainError("close of closed channel"))
+	}
+	if raceenabled {
+		callerpc := getcallerpc()
+		racewritepc(c.raceaddr(), callerpc, abi.FuncPCABIInternal(closechan))
+		racerelease(c.raceaddr())
+	}
+	c.closed = 1
+	var glist gList
+	for {
+		sg := c.recvq.dequeue()
+		if sg == nil {
+			break
+		}
+		if sg.elem != nil {
+			typedmemclr(c.elemtype, sg.elem)
+			sg.elem = nil
+		}
+		if sg.releasetime != 0 {
+			sg.releasetime = cputicks()
+		}
+		gp := sg.g
+		gp.param = unsafe.Pointer(sg)
+		sg.success = false
+		if raceenabled {
+			raceacquireg(gp, c.raceaddr())
+		}
+		glist.push(gp)
+	}
+	for {
+		sg := c.sendq.dequeue()
+		if sg == nil {
+			break
+		}
+		sg.elem = nil
+		if sg.releasetime != 0 {
+			sg.releasetime = cputicks()
+		}
+		gp := sg.g
+		gp.param = unsafe.Pointer(sg)
+		sg.success = false
+		if raceenabled {
+			raceacquireg(gp, c.raceaddr())
+		}
+		glist.push(gp)
+	}
+	unlock(&c.lock)
+	for !glist.empty() {
+		gp := glist.pop()
+		gp.schedlink = 0
+		goready(gp, 3)
+	}
+}
+```
+这个方法做了几件事情：
+
+* 首先进行参数检查，如果通道 c 为 nil ，则触发恐慌。
+* 加锁后，检查通道是否已经关闭，如果已经关闭，也触发恐慌。
+* 如果启用了竞态检测，进行相关的写操作和释放操作记录。
+* 将通道的接收队列中的所有等待接收的 sudog 取出，并进行一些清理和状态设置，将对应的 Goroutine 放入 glist 中。
+* 对发送队列做同样的操作，取出所有等待发送的 sudog，进行清理和状态设置，将对应的 Goroutine 放入 glist 中。
+* 解锁通道。
+* 遍历 glist ，将其中的 Goroutine 标记为就绪状态，唤醒协程。
 
 ## 参考
 参考了滴滴的一个大佬的文章，我自己加上了一部分个人理解和总结。
