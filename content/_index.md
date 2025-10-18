@@ -11,18 +11,19 @@ toc: false
 ## Post
 我会在这里发布技术文章和探索类的项目，偶尔我也会发布我的生活，思考和一些有趣的事情。
 
-{{< cards cols="1">}}
+{{< cards cols="2">}}
 {{< card link="/" title="weaver" image="./index/learn_gin_cover.png" subtitle="这是我学习Gin框架的实践项目笔记，记录了从零开始构建一个后台管理模板项目的过程" >}}
-{{< card link="/" title="weaver-front" image="./index/learn_gin_web_front_cover.png" subtitle="配合weaver而做的前端项目" >}}
+{{< card link="/" title="weaver front" image="./index/learn_gin_web_front_cover.png" subtitle="配合weaver而做的前端项目" >}}
 {{< card link="/docs/learn-threejs/" title="three.js-roadmap" image="./index/learn_three_cover.png" subtitle="学习Three.js的笔记" >}}
+{{< card link="/docs/micro-service/" title="Microservices" image="./index/micro_service_cover.png" subtitle="微服务从入门到入土" >}}
 {{< /cards >}}
 
 {{< cards cols="2">}}
-{{< card link="/docs/data-structure/" title="data-structure" image="./index/data_structure_cover.png" subtitle="重新学习一下数据结构吧～" >}}
+{{< card link="/docs/data-structure/" title="data structure" image="./index/data_structure_cover.png" subtitle="重新学习一下数据结构吧～" >}}
 {{< card link="/docs/algorithm/" title="algorithm" image="./index/algorithm_cover.png" subtitle="经典算法题" >}}
-{{< card link="/docs/computer-composition/" title="computer-composition" image="./index/computer_composition_cover.png" subtitle="计算机组成原理" >}}
+{{< card link="/docs/computer-composition/" title="computer composition" image="./index/computer_composition_cover.png" subtitle="计算机组成原理" >}}
 {{< card link="/" title="tracker" image="./index/tracker_cover.png" subtitle="简单的实现前端性能/异常监控" >}}
-{{< card link="/" title="supuwoerc-utils" image="./index/npm_utils_cover.png" subtitle="制作自己的前端方法库" >}}
+{{< card link="/" title="supuwoerc utils" image="./index/npm_utils_cover.png" subtitle="制作自己的前端方法库" >}}
 {{< card link="/" title="fitness" image="./index/fitness_cover.png" subtitle="这样肥胖的我，依旧在努力前行" >}}
 {{< /cards >}}
 
