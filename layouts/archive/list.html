@@ -30,7 +30,7 @@
     const masonry = {
       canvas: null,
       canvasCtx: null,
-      row: 10,
+      row: 4,
       column: 10,
       gap: 20,
       moveable: false,
@@ -92,7 +92,7 @@
           if (img.y > this.height - this.itemHeight) {
             img.y -= this.height + this.gap;
           }
-          if (img.y < -this.height) {
+          if (img.y < -this.itemHeight) {
             img.y += this.height + this.gap;
           }
           this.canvasCtx.drawImage(
