@@ -1,15 +1,138 @@
-{{ define "main" }}
-  <div class='hx:mx-auto hx:flex hextra-max-page-width'>
-    <article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
-      <main class="hx:w-full hx:min-w-0 hx:max-w-6xl hx:px-6 hx:pt-4 hx:md:px-12">
-        {{ partial "breadcrumb.html" (dict "page" . "enable" true) }}
-        <div class="content">
-          {{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
-          {{ .Content }}
-        </div>
-        {{ partial "components/last-updated.html" . }}
-        {{ partial "components/pager.html" . }}
-      </main>
-    </article>
+<style>
+  * {
+    padding: 0;
+    margin: 0;
+  }
+
+  body {
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .archive {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+</style>
+<html lang="{{ .Site.LanguageCode }}">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Title }} - {{ .Site.Title }}</title>
+  </head>
+  <div class="archive-container">
+    <canvas class="archive"></canvas>
   </div>
-{{ end }}
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+  <script>
+    const masonry = {
+      canvas: null,
+      canvasCtx: null,
+      row: 10,
+      column: 10,
+      gap: 20,
+      moveable: false,
+      itemWidth: 200,
+      itemHeight: 300,
+      width: 0,
+      height: 0,
+      items: [],
+      source: [],
+      init() {
+        this.canvas = document.querySelector(".archive");
+        this.canvasCtx = this.canvas.getContext("2d");
+        this.width = this.column * (this.itemWidth + this.gap) - this.gap;
+        this.height = this.row * (this.itemHeight + this.gap) - this.gap;
+        this.resize();
+        this.initEvent();
+        this.initSource().then(() => this.creatItems());
+      },
+      resize() {
+        this.canvas.width = this.canvas.clientWidth;
+        this.canvas.height = this.canvas.clientHeight;
+        if (this.items.length) {
+          this.creatItems();
+        }
+      },
+      initEvent() {
+        window.addEventListener("resize", () => {
+          this.resize();
+        });
+        // 当鼠标按下时，才可以移动所有图片
+        this.canvas.addEventListener("mousedown", (e) => {
+          this.moveable = true;
+        });
+        // 当鼠标弹起时，图片无法被移动，并且调用check_img函数，获取当前鼠标所指向的图片
+        this.canvas.addEventListener("mouseup", (e) => {
+          this.moveable = false;
+        });
+        // 当鼠标离开选区时，图片无法被移动，
+        this.canvas.addEventListener("mouseleave", () => {
+          this.moveable = false;
+        });
+        // 当鼠标移动时，调用move_imgs函数，移动所有图片
+        this.canvas.addEventListener("mousemove", (e) => {
+          if (!this.moveable) return;
+          this.moveItems(e.movementX, e.movementY);
+        });
+      },
+      moveItems(x, y) {
+        this.canvasCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.items.forEach((img) => {
+          img.x += x;
+          if (img.x > this.width - this.itemWidth) {
+            img.x -= this.width + this.gap;
+          }
+          if (img.x < -this.itemWidth) {
+            img.x += this.width + this.gap;
+          }
+          img.y += y;
+          if (img.y > this.height - this.itemHeight) {
+            img.y -= this.height + this.gap;
+          }
+          if (img.y < -this.height) {
+            img.y += this.height + this.gap;
+          }
+          this.canvasCtx.drawImage(
+            img.img,
+            img.x,
+            img.y,
+            this.itemWidth,
+            this.itemHeight
+          );
+        });
+      },
+      initSource() {
+        let self = this;
+        return new Promise((resolve) => {
+          for (let i = 0; i < this.row * this.column; i++) {
+            let img = new Image();
+            img.src = `https://picsum.photos/seed/${i}/200/300`;
+            img.onload = () => {
+              self.source.push(img);
+              if (self.source.length >= self.row * self.column) {
+                resolve();
+                console.log(self);
+              }
+            };
+          }
+        });
+      },
+      creatItems() {
+        this.items = [];
+        for (let i = 0; i < this.row * this.column; i++) {
+          let column = i % this.column;
+          let row = Math.floor(i / this.column);
+          let x = column * (this.itemWidth + this.gap);
+          let y = row * (this.itemHeight + this.gap);
+          let img = this.source[i];
+          this.items.push({ img, x, y });
+          this.canvasCtx.drawImage(img, x, y, this.itemWidth, this.itemHeight);
+        }
+      },
+    };
+    masonry.init();
+  </script>
+</html>
